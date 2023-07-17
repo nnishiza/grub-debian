@@ -1,0 +1,96 @@
+From: Nobuyuki Nishizawa <nobuyuki@westmarsh.jp>
+Date: Tue, 18 Jul 2023 00:18:49 +0900
+Subject: Support parity-first and parity-last layout of mdraid.
+
+---
+ grub-core/disk/diskfilter.c | 41 ++++++++++++++++++++++++++++-------------
+ include/grub/diskfilter.h   |  6 ++++--
+ 2 files changed, 32 insertions(+), 15 deletions(-)
+
+diff --git a/grub-core/disk/diskfilter.c b/grub-core/disk/diskfilter.c
+index 0320115..00b019e 100644
+--- a/grub-core/disk/diskfilter.c
++++ b/grub-core/disk/diskfilter.c
+@@ -706,25 +706,35 @@ read_segment (struct grub_diskfilter_segment *seg, grub_disk_addr_t sector,
+ 	  {
+ 	    grub_divmod64 (read_sector, seg->node_count, &p);
+ 
+-	    if (! (seg->layout & GRUB_RAID_LAYOUT_RIGHT_MASK))
+-	      p = seg->node_count - 1 - p;
+-
+-	    if (seg->layout & GRUB_RAID_LAYOUT_SYMMETRIC_MASK)
++	    if (seg->layout == GRUB_RAID_LAYOUT_PARITY_0)
+ 	      {
+-		disknr += p + n;
++	        p = 0;
++	        disknr += n;
+ 	      }
++	    else if (seg->layout == GRUB_RAID_LAYOUT_PARITY_N)
++	      p = seg->node_count - n;
+ 	    else
+ 	      {
+-		grub_uint32_t q;
++		if (! (seg->layout & GRUB_RAID_LAYOUT_RIGHT_MASK))
++		  p = seg->node_count - 1 - p;
+ 
+-		q = p + (n - 1);
+-		if (q >= seg->node_count)
+-		  q -= seg->node_count;
++		if (seg->layout & GRUB_RAID_LAYOUT_SYMMETRIC_MASK)
++		  {
++		    disknr += p + n;
++		  }
++		else
++		  {
++		    grub_uint32_t q;
+ 
+-		if (disknr >= p)
+-		  disknr += n;
+-		else if (disknr >= q)
+-		  disknr += q + 1;
++		    q = p + (n - 1);
++		    if (q >= seg->node_count)
++		      q -= seg->node_count;
++
++		    if (disknr >= p)
++		      disknr += n;
++		    else if (disknr >= q)
++		      disknr += q + 1;
++		  }
+ 	      }
+ 
+ 	    if (disknr >= seg->node_count)
+@@ -796,6 +806,11 @@ read_segment (struct grub_diskfilter_segment *seg, grub_disk_addr_t sector,
+ 	    b = 0;
+ 	    disknr++;
+ 
++	    if (seg->layout == GRUB_RAID_LAYOUT_PARITY_0
++	        || seg->layout == GRUB_RAID_LAYOUT_PARITY_N)
++	      {
++		next_level = 0;
++	      }
+ 	    if (seg->layout & GRUB_RAID_LAYOUT_SYMMETRIC_MASK)
+ 	      {
+ 		if (disknr == seg->node_count)
+diff --git a/include/grub/diskfilter.h b/include/grub/diskfilter.h
+index 8deb1a8..677767a 100644
+--- a/include/grub/diskfilter.h
++++ b/include/grub/diskfilter.h
+@@ -27,13 +27,15 @@ enum
+   {
+     GRUB_RAID_LAYOUT_RIGHT_MASK	= 1,
+     GRUB_RAID_LAYOUT_SYMMETRIC_MASK = 2,
+-    GRUB_RAID_LAYOUT_MUL_FROM_POS = 4,
++    GRUB_RAID_LAYOUT_MUL_FROM_POS = 16384,
+ 
+     GRUB_RAID_LAYOUT_LEFT_ASYMMETRIC = 0,
+     GRUB_RAID_LAYOUT_RIGHT_ASYMMETRIC = GRUB_RAID_LAYOUT_RIGHT_MASK,
+     GRUB_RAID_LAYOUT_LEFT_SYMMETRIC = GRUB_RAID_LAYOUT_SYMMETRIC_MASK,
+     GRUB_RAID_LAYOUT_RIGHT_SYMMETRIC = (GRUB_RAID_LAYOUT_RIGHT_MASK
+-					| GRUB_RAID_LAYOUT_SYMMETRIC_MASK)
++					| GRUB_RAID_LAYOUT_SYMMETRIC_MASK),
++    GRUB_RAID_LAYOUT_PARITY_0 = 4,
++    GRUB_RAID_LAYOUT_PARITY_N = 5
+   };
+ 
+ 

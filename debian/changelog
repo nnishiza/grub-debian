@@ -1,3 +1,9 @@
+grub2 (2.06-13wm1) UNRELEASED; urgency=medium
+
+  * Support parity-first and parity-last layout of mdraid.
+
+ -- Nobuyuki Nishizawa <nobuyuki@westmarsh.jp>  Tue, 18 Jul 2023 00:12:33 +0900
+
 grub2 (2.06-13) unstable; urgency=medium
 
   [ Steve McIntyre ]
